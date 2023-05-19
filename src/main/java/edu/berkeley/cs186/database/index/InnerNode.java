@@ -102,7 +102,40 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        int index = numLessThanEqual(key, keys);
+        Long childPageNum = children.get(index);
+        BPlusNode bPlusNode = BPlusNode.fromBytes(metadata, bufferManager, treeContext, childPageNum);
+        Optional<Pair<DataBox, Long>> res = bPlusNode.put(key, rid);
+
+        if (res.isPresent()) {
+            Pair<DataBox, Long> pii = res.get();
+            DataBox splitKey = pii.getFirst();
+            Long splitPgNum = pii.getSecond();
+
+            int pos = numLessThanEqual(splitKey, keys);
+            keys.add(pos, splitKey);
+            children.add(pos, splitPgNum);
+            int order = metadata.getOrder();
+
+            if (keys.size() > 2 * order) {
+                List<DataBox> splitKeys = new ArrayList<>(keys.subList(order+1, keys.size()));
+                List<Long> splitChildren = new ArrayList<>(children.subList(order+1, children.size()));
+                DataBox middleKey = keys.get(order);
+                keys.subList(order, keys.size()).clear();
+                children.subList(order+1, children.size()).clear();
+
+                InnerNode splitInnerNode = new InnerNode(metadata, bufferManager, splitKeys, splitChildren, treeContext);
+
+                splitInnerNode.sync();
+                sync();
+
+                return Optional.of(new Pair<>(middleKey, splitInnerNode.getPage().getPageNum()));
+            }
+        }
+
+        sync();
+
+        return res;
     }
 
     // See BPlusNode.bulkLoad.
@@ -119,6 +152,10 @@ class InnerNode extends BPlusNode {
     public void remove(DataBox key) {
         // TODO(proj2): implement
 
+        int index = numLessThanEqual(key, keys);
+        Long childPageNum = children.get(index);
+        BPlusNode bPlusNode = BPlusNode.fromBytes(metadata, bufferManager, treeContext, childPageNum);
+        bPlusNode.remove(key);
         return;
     }
 

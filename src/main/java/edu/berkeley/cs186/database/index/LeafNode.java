@@ -164,6 +164,30 @@ class LeafNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
 
+        if (keys.contains(key)) {
+            throw new BPlusTreeException("Our B+ trees do not support duplicate entries with the same key");
+        }
+
+        int index = searchPutPosition(key);
+        keys.add(index, key);
+        rids.add(index, rid);
+        int order = metadata.getOrder();
+
+        if (keys.size() > 2 * order) {
+            List<DataBox> splitKeys = new ArrayList<>(keys.subList(order, keys.size()));
+            List<RecordId> splitRids = new ArrayList<>(rids.subList(order, rids.size()));
+            keys.subList(order, keys.size()).clear();
+            rids.subList(order, rids.size()).clear();
+
+            LeafNode splitLeafNode = new LeafNode(metadata, bufferManager, splitKeys, splitRids, rightSibling, treeContext);
+            this.rightSibling = Optional.of(splitLeafNode.getPage().getPageNum());
+
+            splitLeafNode.sync();
+            sync();
+
+            return Optional.of(new Pair<>(splitKeys.get(0), splitLeafNode.getPage().getPageNum()));
+        }
+        sync();
         return Optional.empty();
     }
 
@@ -181,6 +205,12 @@ class LeafNode extends BPlusNode {
     public void remove(DataBox key) {
         // TODO(proj2): implement
 
+        if (keys.contains(key)) {
+            int index = keys.indexOf(key);
+            keys.remove(key);
+            rids.remove(index);
+            sync();
+        }
         return;
     }
 
@@ -213,6 +243,16 @@ class LeafNode extends BPlusNode {
     @Override
     public Page getPage() {
         return page;
+    }
+
+    /** Return the index of key to be inserted. */
+    private int searchPutPosition(DataBox key) {
+        int index = 0;
+        for (DataBox data : keys) {
+            if (data.compareTo(key) < 0) index++;
+            else break;
+        }
+        return index;
     }
 
     /** Returns the right sibling of this leaf, if it has one. */

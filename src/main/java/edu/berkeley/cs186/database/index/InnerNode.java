@@ -112,9 +112,9 @@ class InnerNode extends BPlusNode {
             DataBox splitKey = pii.getFirst();
             Long splitPgNum = pii.getSecond();
 
-            int pos = numLessThanEqual(splitKey, keys);
+            int pos = numLessThan(key, keys); // 按插入的key排序， 而不是分裂的key排序
             keys.add(pos, splitKey);
-            children.add(pos, splitPgNum);
+            children.add(pos+1, splitPgNum);
             int order = metadata.getOrder();
 
             if (keys.size() > 2 * order) {
@@ -128,14 +128,19 @@ class InnerNode extends BPlusNode {
 
                 splitInnerNode.sync();
                 sync();
-
+                assert(keys.size() == order);
+                assert(children.size() == order + 1);
                 return Optional.of(new Pair<>(middleKey, splitInnerNode.getPage().getPageNum()));
+            }
+            else {
+                sync();
+                return Optional.empty();
             }
         }
 
         sync();
 
-        return res;
+        return Optional.empty();
     }
 
     // See BPlusNode.bulkLoad.

@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.swing.text.html.Option;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -197,7 +198,26 @@ class LeafNode extends BPlusNode {
             float fillFactor) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        int fillOrder = Math.round(fillFactor * 2 * metadata.getOrder());
+        for (int i = keys.size() + 1; i <= fillOrder + 1 && data.hasNext(); i++) {
+            Pair<DataBox, RecordId> entry = data.next();
+            keys.add(entry.getFirst());
+            rids.add(entry.getSecond());
+        }
+
+        if (keys.size() < fillOrder + 1) {
+            sync();
+            return Optional.empty();
+        }
+        List<DataBox> rightKeys = new ArrayList<>();
+        List<RecordId> rightRids = new ArrayList<>();
+        rightKeys.add(keys.remove(fillOrder));
+        rightRids.add(rids.remove(fillOrder));
+        LeafNode right = new LeafNode(metadata, bufferManager, rightKeys, rightRids, Optional.empty(), treeContext);
+        this.rightSibling = Optional.of(right.getPage().getPageNum());
+        sync();
+        right.sync();
+        return Optional.of(new Pair<DataBox, Long>(rightKeys.get(0), right.getPage().getPageNum()));
     }
 
     // See BPlusNode.remove.

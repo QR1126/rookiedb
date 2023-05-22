@@ -149,7 +149,38 @@ class InnerNode extends BPlusNode {
             float fillFactor) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        int d = metadata.getOrder();
+        while (keys.size() <= 2*d) {
+            BPlusNode rightMostChild = this.getChild(children.size() - 1);
+            Optional<Pair<DataBox, Long>> feedBack = rightMostChild.bulkLoad(data, fillFactor);
+            if (feedBack.isPresent()) {
+                keys.add(feedBack.get().getFirst());
+                children.add(feedBack.get().getSecond());
+            }
+            else {
+                break;
+            }
+        }
+
+        if (keys.size() < 2*d+1) {
+            sync();
+            return Optional.empty();
+        }
+        else {
+            assert(keys.size() == 2*d+1);
+            List<DataBox> rightKeys = new ArrayList<>();
+            List<Long> rightChildren = new ArrayList<>();
+            for (int i = 0; i <= d; i++) {
+                rightKeys.add(keys.remove(d));
+                rightChildren.add(children.remove(d+1));
+            }
+            DataBox pushUpKey = rightKeys.remove(0);
+            InnerNode right = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+            long pageNum = right.getPage().getPageNum();
+            sync();
+            right.sync();
+            return Optional.of(new Pair<DataBox, Long>(pushUpKey, pageNum));
+        }
     }
 
     // See BPlusNode.remove.

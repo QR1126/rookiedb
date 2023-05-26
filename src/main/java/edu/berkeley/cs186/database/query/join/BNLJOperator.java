@@ -88,6 +88,11 @@ public class BNLJOperator extends JoinOperator {
          */
         private void fetchNextLeftBlock() {
             // TODO(proj3_part1): implement
+
+            if (!leftSourceIterator.hasNext()) return;
+            this.leftBlockIterator = QueryOperator.getBlockIterator(leftSourceIterator, getLeftSource().getSchema(), numBuffers - 2);
+            this.leftBlockIterator.markNext();
+            this.leftRecord = leftBlockIterator.next();
         }
 
         /**
@@ -103,6 +108,10 @@ public class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRightPage() {
             // TODO(proj3_part1): implement
+
+            if (!rightSourceIterator.hasNext()) return;
+            this.rightPageIterator = QueryOperator.getBlockIterator(rightSourceIterator, getRightSource().getSchema(), 1);
+            this.rightPageIterator.markNext();
         }
 
         /**
@@ -115,7 +124,28 @@ public class BNLJOperator extends JoinOperator {
          */
         private Record fetchNextRecord() {
             // TODO(proj3_part1): implement
-            return null;
+
+            Record rightRecord;
+            while (true) {
+                if (rightPageIterator.hasNext()) {
+                } else if (leftBlockIterator.hasNext()) {
+                    leftRecord = leftBlockIterator.next();
+                    rightPageIterator.reset();
+                } else if (rightSourceIterator.hasNext()) {
+                    leftBlockIterator.reset();
+                    leftRecord = leftBlockIterator.next();
+                    fetchNextRightPage();
+                } else if (leftSourceIterator.hasNext()) {
+                    fetchNextLeftBlock();
+                    rightSourceIterator.reset();
+                    fetchNextRightPage();
+                } else {
+                    return null;
+                }
+                rightRecord = rightPageIterator.next();
+                if (compare(leftRecord, rightRecord) == 0)
+                    return leftRecord.concat(rightRecord);
+            }
         }
 
         /**

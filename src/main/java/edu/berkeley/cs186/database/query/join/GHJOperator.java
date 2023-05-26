@@ -71,6 +71,16 @@ public class GHJOperator extends JoinOperator {
         // You may find the implementation in SHJOperator.java to be a good
         // starting point. You can use the static method HashFunc.hashDataBox
         // to get a hash value.
+
+        for (Record record : records) {
+            DataBox columnValue = record.getValue(left ? getLeftColumnIndex() : getRightColumnIndex());
+            int hash = HashFunc.hashDataBox(columnValue, pass);
+            int partitionNum = hash % partitions.length;
+            if (partitionNum < 0) {
+                partitionNum += partitions.length;
+            }
+            partitions[partitionNum].add(record);
+        }
         return;
     }
 
@@ -112,6 +122,26 @@ public class GHJOperator extends JoinOperator {
         // You shouldn't refer to any variable starting with "left" or "right"
         // here, use the "build" and "probe" variables we set up for you.
         // Check out how SHJOperator implements this function if you feel stuck.
+
+        // build
+        Map<DataBox, List<Record>> map = new HashMap<>();
+        for (Record record : buildRecords) {
+            DataBox value = record.getValue(buildColumnIndex);
+            if (!map.containsKey(value)) {
+                map.put(value, new ArrayList<>());
+            }
+            map.get(value).add(record);
+        }
+
+        // probing
+        for (Record probingRecord : probeRecords) {
+            DataBox probingValue = probingRecord.getValue(probeColumnIndex);
+            if (!map.containsKey(probingValue)) continue;
+            for (Record r : map.get(probingValue)) {
+                Record joinedRecord = r.concat(probingRecord);
+                this.joinedRecords.add(joinedRecord);
+            }
+        }
     }
 
     /**
@@ -136,6 +166,11 @@ public class GHJOperator extends JoinOperator {
             // TODO(proj3_part1): implement the rest of grace hash join
             // If you meet the conditions to run the build and probe you should
             // do so immediately. Otherwise you should make a recursive call.
+            if (leftPartitions[i].getNumPages() <= numBuffers-2 || rightPartitions[i].getNumPages() <= numBuffers-2) {
+                buildAndProbe(leftPartitions[i], rightPartitions[i]);
+            } else {
+                run(leftPartitions[i].getScanOperator(), rightPartitions[i].getScanOperator(), pass+1);
+            }
         }
     }
 
@@ -203,6 +238,11 @@ public class GHJOperator extends JoinOperator {
 
         // TODO(proj3_part1): populate leftRecords and rightRecords such that
         // SHJ breaks when trying to join them but not GHJ
+
+        for (int i = 0; i < 161; i++) {
+            leftRecords.add(createRecord(i));
+            rightRecords.add(createRecord(i));
+        }
         return new Pair<>(leftRecords, rightRecords);
     }
 
@@ -223,7 +263,10 @@ public class GHJOperator extends JoinOperator {
         ArrayList<Record> leftRecords = new ArrayList<>();
         ArrayList<Record> rightRecords = new ArrayList<>();
         // TODO(proj3_part1): populate leftRecords and rightRecords such that GHJ breaks
-
+        for (int i = 0; i < 33; i++) {
+            leftRecords.add(createRecord(0));
+            rightRecords.add(createRecord(0));
+        }
         return new Pair<>(leftRecords, rightRecords);
     }
 }

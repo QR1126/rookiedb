@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.table.Schema;
 import edu.berkeley.cs186.database.table.stats.TableStats;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 public class SortOperator extends QueryOperator {
     protected Comparator<Record> comparator;
@@ -87,7 +88,10 @@ public class SortOperator extends QueryOperator {
      */
     public Run sortRun(Iterator<Record> records) {
         // TODO(proj3_part1): implement
-        return null;
+        ArrayList<Record> list = new ArrayList<>();
+        records.forEachRemaining(record -> list.add(record));
+        Collections.sort(list, new RecordComparator());
+        return makeRun(list);
     }
 
     /**
@@ -108,9 +112,25 @@ public class SortOperator extends QueryOperator {
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
         // TODO(proj3_part1): implement
-        return null;
-    }
 
+        PriorityQueue<Pair<Record, Integer>> pq = new PriorityQueue<>(new RecordPairComparator());
+        Run output = makeRun();
+        List<BacktrackingIterator<Record>> list = new ArrayList<>();
+        for (Run run : runs) list.add(run.iterator());
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).hasNext()) pq.add(new Pair<>(list.get(i).next(), i));
+        }
+        while (!pq.isEmpty()) {
+            Pair<Record, Integer> pii = pq.poll();
+            Record r = pii.getFirst();
+            int i = pii.getSecond();
+            output.add(r);
+            if (list.get(i).hasNext()) {
+                pq.add(new Pair<>(list.get(i).next(), i));
+            }
+        }
+        return output;
+    }
     /**
      * Compares the two (record, integer) pairs based only on the record
      * component using the default comparator. You may find this useful for
@@ -133,7 +153,13 @@ public class SortOperator extends QueryOperator {
      */
     public List<Run> mergePass(List<Run> runs) {
         // TODO(proj3_part1): implement
-        return Collections.emptyList();
+
+        List<Run> res = new ArrayList<>();
+        int mergingNum = numBuffers - 1;
+        for (int i = 0; i + mergingNum <= runs.size(); i += mergingNum) {
+            res.add(mergeSortedRuns(runs.subList(i, Math.min(runs.size(), i + mergingNum))));
+        }
+        return res;
     }
 
     /**
@@ -149,7 +175,14 @@ public class SortOperator extends QueryOperator {
         Iterator<Record> sourceIterator = getSource().iterator();
 
         // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        List<Run> list = new ArrayList<>();
+        while (sourceIterator.hasNext()) {
+            list.add(sortRun(getBlockIterator(sourceIterator, computeSchema(), numBuffers)));
+        }
+        while (list.size() > 1) {
+            list = mergePass(list);
+        }
+        return list.get(0);
     }
 
     /**

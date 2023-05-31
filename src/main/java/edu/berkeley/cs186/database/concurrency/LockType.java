@@ -23,7 +23,14 @@ public enum LockType {
         }
         // TODO(proj4_part1): implement
 
-        return false;
+        switch (a) {
+            case IS: return !b.equals(X);
+            case IX: return !(b.equals(S) || b.equals(SIX) || b.equals(X));
+            case S: return !(b.equals(IX) || b.equals(SIX) || b.equals(X));
+            case SIX: return (b.equals(NL) || b.equals(IS));
+            case X: return b.equals(NL);
+        }
+        return true;
     }
 
     /**
@@ -55,7 +62,16 @@ public enum LockType {
         }
         // TODO(proj4_part1): implement
 
-        return false;
+        switch (parentLockType) {
+            case NL:
+            case X:
+                return childLockType.equals(NL);
+            case IS: return (childLockType.equals(NL) || childLockType.equals(IS) || childLockType.equals(S));
+            case IX: return true;
+            case S : return childLockType.equals(NL) || childLockType.equals(S);
+            case SIX: return childLockType.equals(NL) || childLockType.equals(X);
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -70,7 +86,15 @@ public enum LockType {
         }
         // TODO(proj4_part1): implement
 
-        return false;
+        switch (substitute) {
+            case NL: return required == NL;
+            case IS: return required == NL || required == IS;
+            case IX: return required == IS || required == IX || required == NL;
+            case S: return required == NL || required == IS || required == S;
+            case SIX: return !(required == X);
+            case X: return true;
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**

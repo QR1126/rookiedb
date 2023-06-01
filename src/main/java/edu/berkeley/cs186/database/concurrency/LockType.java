@@ -68,8 +68,8 @@ public enum LockType {
                 return childLockType.equals(NL);
             case IS: return (childLockType.equals(NL) || childLockType.equals(IS) || childLockType.equals(S));
             case IX: return true;
-            case S : return childLockType.equals(NL) || childLockType.equals(S);
-            case SIX: return childLockType.equals(NL) || childLockType.equals(X);
+            case S : return childLockType == NL;
+            case SIX: return childLockType == NL || childLockType == X || childLockType == IX || childLockType == SIX;
             default: throw new UnsupportedOperationException("bad lock type");
         }
     }

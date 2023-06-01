@@ -42,8 +42,51 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
+
+        //  The current lock type can effectively substitute the requested type
+        if (LockType.substitutable(effectiveLockType, requestType)) return;
+
+        //  The current lock type is IX and the requested lock is S
+        if (explicitLockType == LockType.IX && requestType == LockType.S) {
+            lockContext.promote(transaction, LockType.SIX);
+            return;
+        }
+
+        //  The current lock type is an intent lock
+        if (explicitLockType.isIntent()) {
+            lockContext.escalate(transaction);
+            effectiveLockType = lockContext.getExplicitLockType(transaction);
+            if (explicitLockType == requestType || explicitLockType == LockType.X) return;
+        }
+
+        // None of the above: In this case, consider what values the explicit
+        // lock type can be, and think about how ancestor looks will need to be acquired or changed.
+        if (requestType == LockType.S) {
+            enforceLock(transaction, parentContext, LockType.IS);
+        } else {
+            enforceLock(transaction, parentContext, LockType.IX);
+        }
+        if (explicitLockType == LockType.NL) {
+            lockContext.acquire(transaction, requestType);
+        } else {
+            lockContext.promote(transaction, requestType);
+        }
+
         return;
     }
 
     // TODO(proj4_part2) add any helper methods you want
+    private static void enforceLock(TransactionContext transaction, LockContext lockContext, LockType lockType) {
+        assert (lockType == LockType.IS || lockType == LockType.IX);
+        if (lockContext == null) return;
+        enforceLock(transaction, lockContext.parentContext(), lockType);
+        LockType currLockType = lockContext.getExplicitLockType(transaction);
+        if (!LockType.substitutable(currLockType, lockType)) {
+            if (currLockType == LockType.NL) {
+                lockContext.acquire(transaction, lockType);
+            } else {
+                lockContext.promote(transaction, lockType);
+            }
+        }
+    }
 }
